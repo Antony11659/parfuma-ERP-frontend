@@ -160,11 +160,10 @@ function MatchingWorkspace({ shop, refreshShops }) {
   const [outcome, setOutcome] = useState(null)
   const [error, setError] = useState('')
   const pending = useRef(false)
-  const enabled = shop.state === 'ready'
   const path = `${shopPath}/${shop.id}`
   const params = new URLSearchParams({ page: String(page), q: query })
   if (status) params.set('status', status)
-  const results = useCatalogRead(enabled ? `${path}/matching?${params}` : null)
+  const results = useCatalogRead(`${path}/matching?${params}`)
   const brands = useCatalogRead(creating ? '/erp/brands' : null, true)
   const volumes = useCatalogRead(creating ? '/erp/volumes' : null)
   const selected = Object.values(approved)
@@ -180,7 +179,7 @@ function MatchingWorkspace({ shop, refreshShops }) {
   }
 
   async function register() {
-    if (!selected.length || pending.current || !enabled) return
+    if (!selected.length || pending.current) return
     if (!window.confirm(`Register ${selected.length} approved internal mappings?`)) return
     pending.current = true
     setSaving(true)
@@ -209,9 +208,9 @@ function MatchingWorkspace({ shop, refreshShops }) {
     }
   }
 
-  if (!enabled) return <p>Select Refresh to synchronize this shop before matching.</p>
   return (
     <>
+      {shop.state !== 'ready' && <p>Refresh the shop to include visible marketplace products. Detached SKUs are available here.</p>}
       <div className="catalog-filters sku-filters">
         <label>Search marketplace products<input type="search" value={query} maxLength={100}
           onChange={event => { setQuery(event.target.value); setPage(1) }} /></label>

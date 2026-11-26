@@ -46,7 +46,7 @@ export function MappingVolume({ perfumeId, value, onChange }) {
 export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
   const dialog = useRef(null)
   const pending = useRef(false)
-  const shops = useCatalogRead(mapping ? null : '/erp/shops')
+  const shops = useCatalogRead('/erp/shops')
   const [target, setTarget] = useState(perfume)
   const [sku, setSku] = useState(mapping?.sku ?? '')
   const [shop, setShop] = useState(mapping?.shop.id ?? '')
@@ -55,6 +55,7 @@ export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
   const [archived, setArchived] = useState(mapping?.is_archived ?? false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [unmatching, setUnmatching] = useState(false)
 
   useEffect(() => {
     const element = dialog.current
@@ -65,11 +66,11 @@ export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
   async function save(event) {
     event.preventDefault()
     if (pending.current) return
-    if (!mapping && (!target || !sku.trim() || !shop || !volume)) {
+    if (!target || !sku.trim() || !shop || !volume) {
       setError('Select a perfume, shop and registered volume, then enter the SKU.')
       return
     }
-    const flags = { is_active: active, is_archived: archived }
+    const fields = { sku: sku.trim(), shop_id: shop, volume_ml: Number(volume), is_active: active, is_archived: archived }
     const path = `/erp/perfumes/${mapping ? perfume.id : target.id}/skus`
     pending.current = true
     setBusy(true)
@@ -77,10 +78,25 @@ export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
     try {
       await erpApi.request(mapping ? `${path}/${mapping.id}` : path, {
         method: mapping ? 'PATCH' : 'POST',
-        body: mapping ? { ...flags, expected_updated_at: mapping.updated_at }
-          : { ...flags, sku: sku.trim(), shop_id: shop, volume_ml: Number(volume) },
+        body: mapping ? { ...fields, perfume_id: target.id, expected_updated_at: mapping.updated_at } : fields,
       })
-      onSaved(mapping ? 'SKU status updated.' : 'SKU registered.')
+      onSaved(mapping ? 'SKU mapping updated.' : 'SKU registered.')
+    } catch (failure) {
+      setError(failure.message)
+    } finally {
+      pending.current = false
+      setBusy(false)
+    }
+  }
+
+  async function unmatch() {
+    if (pending.current) return
+    pending.current = true
+    setBusy(true)
+    setError('')
+    try {
+      await erpApi.request(`/erp/perfumes/${perfume.id}/skus/${mapping.id}?updated_at=${encodeURIComponent(mapping.updated_at)}`, { method: 'DELETE' })
+      onSaved('SKU moved to unmatched.')
     } catch (failure) {
       setError(failure.message)
     } finally {
@@ -93,28 +109,28 @@ export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
     <dialog className="perfume-editor" ref={dialog} aria-labelledby="sku-dialog-title"
       onCancel={event => { event.preventDefault(); if (!pending.current) onClose() }}>
       <h2 id="sku-dialog-title">{mapping ? 'Edit SKU mapping' : 'Add SKU'}</h2>
-      <form onSubmit={save}>
+      {unmatching ? (
+        <>
+          <p>Unmatch SKU {mapping.sku} from {perfume.name}?</p>
+          {error && <p role="alert">{error}</p>}
+          <div className="editor-actions">
+            <button type="button" disabled={busy} onClick={() => { setUnmatching(false); setError('') }}>Back</button>
+            <button type="button" disabled={busy} onClick={unmatch}>Unmatch SKU</button>
+          </div>
+        </>
+      ) : <form onSubmit={save}>
         <p>Changes apply only to internal Supabase mappings. Marketplace product cards are unaffected.</p>
         <fieldset disabled={busy}>
-          {mapping ? <label>Perfume<input value={perfume.name} disabled /></label> : (
-            <PerfumePicker value={target} onChange={next => { setTarget(next); setVolume('') }} />
-          )}
+          <PerfumePicker value={target} onChange={next => { setTarget(next); setVolume('') }} />
           <div className="editor-grid">
-            {mapping ? <label>Shop<input value={mapping.shop.name} disabled /></label> : (
-              <label>Shop<select required value={shop} onChange={event => setShop(event.target.value)}>
-                <option value="">Select shop</option>
-                {shops.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select></label>
-            )}
-            <label>SKU<input required value={sku} disabled={Boolean(mapping)} maxLength={200} onChange={event => setSku(event.target.value)} /></label>
+            <label>Shop<select required value={shop} onChange={event => setShop(event.target.value)}>
+              <option value="">Select shop</option>
+              {shops.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select></label>
+            <label>SKU<input required value={sku} maxLength={200} onChange={event => setSku(event.target.value)} /></label>
           </div>
-          {mapping ? <label>Registered volume<input value={`${volume} ml`} disabled /></label> : (
-            <>
-              <ReadState read={shops} loading="Loading shops…" />
-              <MappingVolume perfumeId={target?.id} value={volume} onChange={setVolume} />
-            </>
-          )}
-          {mapping && <p>SKU, perfume, shop, and volume are locked. Packaging still resolves inactive and archived mappings by SKU.</p>}
+          <ReadState read={shops} loading="Loading shops…" />
+          <MappingVolume perfumeId={target?.id} value={volume} onChange={setVolume} />
           <div className="sku-flags">
             <label><input type="checkbox" checked={active} onChange={event => setActive(event.target.checked)} /> Active</label>
             <label><input type="checkbox" checked={archived} onChange={event => setArchived(event.target.checked)} /> Archived</label>
@@ -123,9 +139,10 @@ export function SkuDialog({ perfume, mapping, onClose, onSaved }) {
         {error && <p role="alert">{error}</p>}
         <div className="editor-actions">
           <button type="button" disabled={busy} onClick={onClose}>Cancel</button>
-          <button className="primary" disabled={busy || (!mapping && (!target || !shop || !volume || !sku.trim()))}>{busy ? 'Saving…' : 'Save SKU'}</button>
+          {mapping && <button type="button" disabled={busy} onClick={() => setUnmatching(true)}>Unmatch SKU</button>}
+          <button className="primary" disabled={busy || !target || !shop || !volume || !sku.trim()}>{busy ? 'Saving…' : 'Save SKU'}</button>
         </div>
-      </form>
+      </form>}
     </dialog>
   )
 }

@@ -1,0 +1,44 @@
+.image-studio, .studio-controls, .studio-results { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.image-studio h2, .image-studio h3 { margin: 0 0 5px; }
+.studio-workspace { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(0, 1.7fr); gap: 16px; }
+.studio-panel { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; margin: 0; }
+.studio-panel legend { padding: 0 6px; font-weight: 700; }
+.studio-search { display: flex; align-items: end; gap: 6px; }
+.studio-search label { display: grid; gap: 4px; flex: 1; min-width: 0; font-size: .88rem; }
+.studio-search input { min-height: 42px; width: 100%; border: 1px solid #554565; border-radius: 8px; padding: 7px; background: #120e1b; color: inherit; }
+.studio-selected { margin: 12px 0 0; color: var(--violet); }
+.studio-perfumes { display: grid; gap: 5px; list-style: none; padding: 0; max-height: 220px; overflow-y: auto; margin: 10px 0; }
+.studio-perfumes button { display: grid; gap: 3px; width: 100%; text-align: left; padding: 6px 9px; }
+.studio-perfumes button span { color: var(--muted); font-size: .8rem; }
+.studio-perfumes button[aria-pressed="true"] { border-color: var(--violet); background: #2b1b45; }
+.studio-panel h3 ~ * { margin-top: 9px; }
+.studio-choose { display: inline-flex; align-items: center; gap: 8px; justify-self: start; }
+.studio-confirmation {
+  width: min(400px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 18px;
+  border: 1px solid #554565;
+  border-radius: 12px;
+  background: var(--panel);
+  color: inherit;
+}
+.studio-confirmation::backdrop { background: #0c0915c9; }
+.studio-confirmation form { display: grid; gap: 12px; }
+.studio-file-name { overflow-wrap: anywhere; }
+.studio-dialog-actions { justify-content: flex-end; }
+.studio-check { display: flex; align-items: start; gap: 6px; line-height: 1.4; }
+.studio-check input { margin-top: 4px; accent-color: var(--violet); }
+.studio-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.studio-preview { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.studio-preview figcaption { padding: 9px 11px; font-weight: 700; }
+.studio-preview div { aspect-ratio: 3 / 4; display: grid; place-items: center; background: var(--highlight); }
+.studio-preview img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.studio-preview p { display: grid; justify-items: center; gap: 8px; padding: 8px; text-align: center; font-size: .85rem; }
+.studio-results > button { justify-self: start; }
+.studio-status { color: var(--violet); font-weight: 700; }
+.studio-validation summary { cursor: pointer; font-weight: 700; }
+.studio-validation dl { display: grid; gap: 8px 15px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.studio-validation dt { color: var(--muted); font-size: .82rem; text-transform: capitalize; }
+.studio-validation dd { overflow-wrap: anywhere; }
+.studio-validation code { font-size: .77rem; }
+@media (max-width: 850px) { .studio-workspace { grid-template-columns: 1fr; } }

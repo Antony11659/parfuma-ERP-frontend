@@ -147,3 +147,47 @@ test('bulk archive sends only decimal-string perfume IDs in the authenticated re
   })
   assert.deepEqual(await client.request(path, { method: 'POST', body: { ids } }), { changed: 2 })
 })
+
+test('image studio sends approved reference bytes and reads authenticated WebP blobs', async () => {
+  const image = new Blob(['reference'], { type: 'text/plain' })
+  const requestHeaders = []
+  const { request } = createErpApi({
+    baseUrl: 'https://erp.example.test',
+    getSession: async () => ({ data: { session: { access_token: 'fixture' } } }),
+    fetcher: async (_url, options) => {
+      requestHeaders.push(options.headers)
+      if (options.method === 'POST') {
+        assert.equal(options.body, image)
+        return Response.json({ status: 'queued' }, { status: 202 })
+      }
+      return new Response('candidate', { headers: { 'Content-Type': 'image/webp' } })
+    },
+  })
+  assert.equal((await request('/erp/image-studio/perfumes/26/jobs', { method: 'POST', image, sourceApproved: true, sourceUsagePermitted: true })).status, 'queued')
+  assert.equal(requestHeaders[0]['Content-Type'], 'application/octet-stream')
+  assert.equal(requestHeaders[0]['X-Source-Approved'], 'true')
+  assert.equal(requestHeaders[0]['X-Source-Usage-Permitted'], 'true')
+  const preview = await request('/erp/image-studio/jobs/local/preview', { responseType: 'webp' })
+  assert.equal(await preview.text(), 'candidate')
+  assert.equal(requestHeaders[1].Authorization, 'Bearer fixture')
+  assert.equal(requestHeaders[1].Accept, 'image/webp')
+})
+
+test('image publication only sends the explicit approval header when confirmed', async () => {
+  const calls = []
+  const { request } = createErpApi({
+    baseUrl: 'https://erp.example.test',
+    getSession: async () => ({ data: { session: { access_token: 'fixture' } } }),
+    fetcher: async (_url, options) => {
+      calls.push(options)
+      return Response.json({ imageId: '6' })
+    },
+  })
+  const path = '/erp/image-studio/jobs/fixture/publish'
+  await request(path, { method: 'POST' })
+  assert.equal(calls[0].headers['X-Candidate-Approved'], undefined)
+  await request(path, { method: 'POST', candidateApproved: true })
+  assert.equal(calls[1].headers['X-Candidate-Approved'], 'true')
+  assert.equal(calls[1].headers.Authorization, 'Bearer fixture')
+  assert.equal(calls[1].body, undefined)
+})

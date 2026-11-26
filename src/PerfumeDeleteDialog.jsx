@@ -2,16 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { erpApi } from './auth'
 import { ReadState, useCatalogRead } from './catalogState'
 
-const counts = [
-  ['Volume variants', 'variants'],
-  ['Marketplace SKU mappings', 'skuMappings'],
-  ['Historical website order items', 'websiteOrderItems'],
-  ['Registered perfume images', 'images'],
-]
 const reasons = [
-  ['skuMappings', 'Marketplace mappings still reference this perfume.'],
   ['websiteOrderItems', 'Historical website order items still reference its variants.'],
-  ['images', 'Registered images must be handled before deletion to avoid orphaning Timeweb files.'],
+  ['images', 'A registered image or publication reservation protects this perfume.'],
   ['unverifiedForeignKeys', 'The database relationships differ from the reviewed schema.'],
 ]
 
@@ -20,7 +13,6 @@ export default function PerfumeDeleteDialog({ perfume, onClose, onDeleted }) {
   const pending = useRef(false)
   const path = `/erp/perfumes/${perfume.id}`
   const preview = useCatalogRead(`${path}/dependencies`)
-  const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState(null)
   const dependencies = failure?.dependencies ?? preview.data
@@ -34,14 +26,13 @@ export default function PerfumeDeleteDialog({ perfume, onClose, onDeleted }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (!eligible || !confirmed || pending.current) return
+    if (!eligible || pending.current) return
     pending.current = true
     setBusy(true)
     try {
       await erpApi.request(path, { method: 'DELETE' })
     } catch (error) {
       setFailure(error)
-      setConfirmed(false)
       return
     } finally {
       pending.current = false
@@ -62,12 +53,9 @@ export default function PerfumeDeleteDialog({ perfume, onClose, onDeleted }) {
         {failure && <p role="alert">{failure.message}</p>}
         {dependencies && (
           <>
-            <dl className="catalog-fields perfume-dependency-counts">
-              {counts.map(([label, key]) => <div key={key}><dt>{label}</dt><dd>{dependencies[key]}</dd></div>)}
-              {dependencies.unverifiedForeignKeys > 0 && <div><dt>Unverified foreign-key definitions</dt><dd>{dependencies.unverifiedForeignKeys}</dd></div>}
-            </dl>
+            <p>{dependencies.skuMappings} {dependencies.skuMappings === 1 ? 'SKU will' : 'SKUs will'} become unmatched if you delete this perfume.</p>
             {dependencies.canDelete ? (
-              <p>Deleting this perfume permanently removes it and its unused volume variants.</p>
+              <p>This permanently deletes the perfume and its volume variants.</p>
             ) : (
               <div className="mapping-warning" role="status">
                 <strong>Deletion blocked</strong>
@@ -82,15 +70,9 @@ export default function PerfumeDeleteDialog({ perfume, onClose, onDeleted }) {
             preview.retry()
           }}>Check dependencies again</button>
         )}
-        {eligible && (
-          <label className="perfume-delete-confirm">
-            <input type="checkbox" checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} />
-            I understand this deletion is permanent.
-          </label>
-        )}
         <div className="editor-actions">
           <button type="button" onClick={onClose} disabled={busy} autoFocus>Cancel</button>
-          <button className="variant-delete" disabled={!eligible || !confirmed || busy}>{busy ? 'Deleting…' : 'Delete permanently'}</button>
+          <button className="variant-delete" disabled={!eligible || busy}>{busy ? 'Deleting…' : 'Delete permanently'}</button>
         </div>
       </form>
     </dialog>

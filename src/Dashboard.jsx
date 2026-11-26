@@ -2,10 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Box, ChevronDown, ClipboardList, FlaskConical, Images, LayoutDashboard, Settings, ShoppingBag, Wallet } from 'lucide-react'
 import { Catalog, PerfumeDetails, perfumeTabs } from './PerfumeCatalog'
 import MarketplaceMatching from './MarketplaceMatching'
+import ImageLibrary from './ImageLibrary'
 
-const pilot = { perfumes: 375, registered: 5 }
-const remaining = pilot.perfumes - pilot.registered
-const coverage = pilot.registered / pilot.perfumes * 100
 const businessMetrics = ['Total revenue', 'Net profit', "Today's orders", 'Orders to process']
 
 const navigation = [
@@ -129,28 +127,7 @@ export default function Dashboard({ brand, email, action, error, preview }) {
         </main> : active.href === '#image-library' ? (
           <main className="overview">
             {error && <p role="alert">{error}</p>}
-            <header className="overview-title">
-              <h1>Image library</h1>
-              <p>Live statistics, filtering, image processing, and uploading are planned for Stage 3.</p>
-            </header>
-            <section aria-labelledby="snapshot-title">
-              <h2 id="snapshot-title" className="section-label">Initial snapshot</h2>
-              <dl className="metrics">
-                <div><dt>Total perfumes</dt><dd>{pilot.perfumes}</dd></div>
-                <div><dt>Registered master images</dt><dd>{pilot.registered}</dd></div>
-                <div><dt>Missing master images</dt><dd>{remaining}</dd></div>
-              </dl>
-              <div className="coverage">
-                <div className="coverage-heading">
-                  <div>
-                    <h3 id="coverage-title">Master image completion</h3>
-                    <p>{pilot.registered} of {pilot.perfumes} perfumes have a registered master image.</p>
-                  </div>
-                  <strong>{coverage.toFixed(2)}%</strong>
-                </div>
-                <progress aria-labelledby="coverage-title" value={pilot.registered} max={pilot.perfumes} />
-              </div>
-            </section>
+            <ImageLibrary preview={preview} studio={new URLSearchParams(query).get('view') === 'studio'} />
           </main>
         ) : isMarketplace && !preview ? (
           <main className="overview">

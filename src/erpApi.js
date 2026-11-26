@@ -20,7 +20,7 @@ function parseBackendOrigin(value, allowLocalHttp) {
 export function createErpApi({ baseUrl, getSession, allowLocalHttp = false, fetcher = fetch }) {
   const origin = parseBackendOrigin(baseUrl, allowLocalHttp)
 
-  async function request(path, { method = 'GET', body, signal, timeoutMs = 12000 } = {}) {
+  async function request(path, { method = 'GET', body, image, sourceApproved, sourceUsagePermitted, candidateApproved, responseType = 'json', signal, timeoutMs = 12000 } = {}) {
     if (!origin) throw new ErpApiError('configuration', 'The ERP backend URL is missing or invalid.')
     const url = new URL(path, origin)
     if (url.origin !== origin || !url.pathname.startsWith('/erp/')) {
@@ -44,12 +44,17 @@ export function createErpApi({ baseUrl, getSession, allowLocalHttp = false, fetc
       const deadline = AbortSignal.timeout(timeoutMs)
       response = await fetcher(url, {
         method,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: image ?? (body === undefined ? undefined : JSON.stringify(body)),
         signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
         headers: {
-          Accept: 'application/json',
+          Accept: responseType === 'webp' ? 'image/webp' : 'application/json',
           Authorization: `Bearer ${session.access_token}`,
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+          ...(candidateApproved === true ? { 'X-Candidate-Approved': 'true' } : {}),
+          ...(image ? {
+            'Content-Type': 'application/octet-stream',
+            ...(sourceApproved === true ? { 'X-Source-Approved': 'true' } : {}),
+            ...(sourceUsagePermitted === true ? { 'X-Source-Usage-Permitted': 'true' } : {}),
+          } : body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         credentials: 'omit',
         redirect: 'error',
@@ -64,6 +69,12 @@ export function createErpApi({ baseUrl, getSession, allowLocalHttp = false, fetc
     }
     if (response.status === 403) throw new ErpApiError('forbidden', 'ERP staff access is required.')
     if (response.status === 404) throw new ErpApiError('notFound', 'The requested record was not found.')
+    if (!response.ok && url.pathname.startsWith('/erp/image-studio/')) {
+      const payload = await response.clone().json().catch(() => null)
+      if (typeof payload?.code === 'string' && payload.code.startsWith('ERP_STUDIO_') && typeof payload.message === 'string') {
+        throw new ErpApiError(payload.code, payload.message)
+      }
+    }
     if (response.status === 400 || response.status === 409) {
       const payload = await response.json().catch(() => null)
       switch (payload?.code) {
@@ -121,6 +132,10 @@ export function createErpApi({ baseUrl, getSession, allowLocalHttp = false, fetc
     if (!response.ok) throw new ErpApiError('unavailable', 'The ERP backend could not verify access. Try again.')
 
     try {
+      if (responseType === 'webp') {
+        if (response.headers.get('Content-Type') !== 'image/webp') throw new Error('Invalid preview type')
+        return await response.blob()
+      }
       return await response.json()
     } catch {
       throw new ErpApiError('response', 'The ERP backend returned an unexpected response.')
